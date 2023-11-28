@@ -1,0 +1,56 @@
+version: 2
+jobs:
+  test:
+    docker:
+      - image: edbizarro/gitlab-ci-pipeline-php:7.2
+      - image: circleci/mysql:5.7
+        environment:
+          MYSQL_DATABASE: "test"
+          MYSQL_ROOT_PASSWORD: "secret"
+    
+    working_directory: /var/www/html
+steps:
+      - checkout
+      # Install Google Chrome
+      - run: sudo apt-get update -y
+      - run: sudo apt-get install unzip xvfb libxi6 libgconf-2-4 libnss3 wget -yqq
+      - run: wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+      - run: sudo sh -c 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+      - run: sudo apt-get update -yqq
+      - run: sudo apt-get install -y google-chrome-stable
+      - restore_cache:
+          keys:
+            - vendor-{{ checksum "composer.json" }}
+      - run: composer update --no-interaction --no-progress --prefer-dist --optimize-autoloader --ignore-platform-reqs
+      - save_cache:
+          paths:
+            - ./vendor
+          key: vendor-{{ checksum "composer.json" }}      
+      - run: cp .env.testing.env
+      - run: php artisan key:generate
+      - run: php artisan config:cache
+      - run: php artisan route:cache
+      - restore_cache:
+          keys:
+            - node-{{ checksum "package.json" }}
+      - run: npm update
+      - save_cache:
+          paths:
+            - ./node_modules
+          key: node-{{ checksum "package.json" }}
+      - run: npm run prod
+      - run: php artisan migrate --seed
+      - run: php artisan storage:link
+      - run:
+          background: true
+          command: php artisan serve
+      - run:
+          background: true
+          command: ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515
+      - run: ./vendor/bin/phpunit
+      - run: php artisan dusk
+workflows:
+  version: 2 
+  deploy:
+    jobs:
+      - test
