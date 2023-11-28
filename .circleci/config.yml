@@ -3,7 +3,7 @@ jobs:
   test:
     docker:
       - image: edbizarro/gitlab-ci-pipeline-php:7.2
-      - image: circleci/mysql:5.7
+      - image: circleci/mysql:8.0
         environment:
           MYSQL_DATABASE: "test"
           MYSQL_ROOT_PASSWORD: "secret"
@@ -33,12 +33,12 @@ steps:
       - restore_cache:
           keys:
             - node-{{ checksum "package.json" }}
-      - run: npm update
-      - save_cache:
-          paths:
-            - ./node_modules
-          key: node-{{ checksum "package.json" }}
-      - run: npm run prod
+      # - run: npm update
+      # - save_cache:
+      #     paths:
+      #       - ./node_modules
+      #     key: node-{{ checksum "package.json" }}
+      # - run: npm run prod
       - run: php artisan migrate --seed
       - run: php artisan storage:link
       - run:
